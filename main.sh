@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Define the token
-TOKEN="adfadlkadgkgad"
+# Define a default token (can be overridden by user input)
+DEFAULT_TOKEN="adfadlkadgkgad"
 
 # Function to update and upgrade the system
 update_system() {
@@ -99,13 +99,12 @@ convert_ports_to_toml_format() {
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
     # Remove any leading or trailing spaces
-    port=$(echo "$port" | xargs)
+    port=$(echo "$port" | awk '{$1=$1;print}')
     port_list+="\"$port=$port\",\n"
   done
   
   # Remove trailing comma and newline
-  port_list=$(echo "$port_list" | sed 's/,$//')
-  port_list=$(echo "$port_list" | sed 's/,$//')
+  port_list=$(echo "$port_list" | awk '{gsub(/,\n$/, ""); print}')
   
   echo -e "$port_list"
 }
@@ -259,9 +258,11 @@ while true; do
 
       case $removal_choice in
         1)
+          read -p "Enter the token: " TOKEN
           remove_single_tunnel
           ;;
         2)
+          read -p "Enter the token: " TOKEN
           remove_all_tunnels
           ;;
         *)
