@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Define the token
+TOKEN="adfadlkadgkgad"
+
 # Function to update and upgrade the system
 update_system() {
   echo "Updating and upgrading the system..."
@@ -95,11 +98,15 @@ convert_ports_to_toml_format() {
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
+    # Remove any leading or trailing spaces
+    port=$(echo "$port" | xargs)
     port_list+="\"$port=$port\",\n"
   done
-  port_list=${port_list%,}  # Remove trailing comma
-  port_list=$(echo "$port_list" | sed 's/,$//')  # Remove any trailing comma that may be left
-
+  
+  # Remove trailing comma and newline
+  port_list=$(echo "$port_list" | sed 's/,$//')
+  port_list=$(echo "$port_list" | sed 's/,$//')
+  
   echo -e "$port_list"
 }
 
@@ -223,7 +230,7 @@ while true; do
       ;;
     3)
       echo "Kharej selected."
-      read -p "Enter the tunnel number: " tunnel_number
+      read -p "Enter the tunnel number (1-10): " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
 
       # Validate input
