@@ -102,7 +102,26 @@ convert_ports_to_toml_format() {
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
-  watch -n 5 'systemctl status backhaul-tu* | grep "Active:"'
+  while true; do
+    clear
+    echo "Tunnel Service Status:"
+    for i in {1..6}; do
+      service_name="backhaul-tu$i"
+      status=$(systemctl status $service_name | grep "Active:")
+      
+      if [[ -n $status ]]; then
+        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
+        uptime=$(echo $status | sed -n 's/.*since \(.*\); \(.*\) ago/\2/p')
+        
+        echo "Tunnel $i: $status"
+        echo "    Active since: $active_since"
+        echo "    Uptime: $uptime"
+      else
+        echo "Tunnel $i: Service not found or inactive"
+      fi
+    done
+    sleep 5
+  done
 }
 
 # Main menu function
