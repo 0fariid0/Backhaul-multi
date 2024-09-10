@@ -1,9 +1,5 @@
 #!/bin/bash
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-plain='\033[0m'
-NC='\033[0m' # No Color
+
 
 # Update and install dependencies
 echo "Updating and installing dependencies..."
@@ -131,19 +127,10 @@ monitor_tunnels() {
         sleep 5
     done
 }
-    SERVER_IP=$(hostname -I | awk '{print $1}')
-    SERVER_COUNTRY=$(curl -sS "http://ip-api.com/json/$SERVER_IP" | jq -r '.country')
-    SERVER_ISP=$(curl -sS "http://ip-api.com/json/$SERVER_IP" | jq -r '.isp')
-    BACK_CORE=$(DVHOST_CLOUD_check_status)
+
 # Main menu function
 menu() {
-    echo "+--------------------------------------------------------------------------------------------------------------------------------------+" 
-    echo -e "|${GREEN}Server Country    |${NC} $SERVER_COUNTRY"
-    echo -e "|${GREEN}Server IP         |${NC} $SERVER_IP"
-    echo -e "|${GREEN}Server ISP        |${NC} $SERVER_ISP"
-    echo -e "|${GREEN}Backhaul          |${NC} $BACK_CORE"
-    echo "+--------------------------------------------------------------------------------------------------------------------------------------+" 
-    echo "Please select an option:"
+        echo "Please select an option:"
     echo "1) Install Core"
     echo "2) Iran"
     echo "3) Kharej"
