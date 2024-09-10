@@ -13,53 +13,23 @@ download_file() {
   echo "Download of $output completed."
 }
 
-# Function to download and extract ZIP files
-download_and_extract_zip() {
-  url=$1
-  output=$2
-  echo "Downloading $output..."
-  wget $url -O $output
-  if [[ $? -ne 0 ]]; then
-    echo "Error downloading $output."
-    exit 1
-  fi
-  echo "Download of $output completed."
-
-  echo "Extracting $output..."
-  unzip $output
-  if [[ $? -eq 0 ]]; then
-    echo "Extraction of $output completed."
-    echo "Removing the ZIP file $output..."
-    rm -f $output
-    echo "$output removed."
-  else
-    echo "Error extracting $output."
-    exit 1
-  fi
-}
-
-# Function to create a TOML file for each tunnel
-create_toml_file() {
+# Function to create a client TOML file for each tunnel
+create_client_toml_file() {
   tunnel_number=$1
-  port_list=$2
-  bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
+  ip_ir=$2
+  remote_port=$((1000 + tunnel_number)) # Example: remote_addr starts from port 1001
 
   cat <<EOF > /root/tu$tunnel_number.toml
-[server]
-bind_addr = "0.0.0.0:$bind_port"
+[client]
+remote_addr = "$ip_ir:$remote_port"
 transport = "tcp"
-token = "adfadlkadgkgad"
-channel_size = 2048
-connection_pool = 16
+token = "Farid@1380"
 nodelay = false
-ports = [
-$port_list
-]
 EOF
-  echo "TOML file tu$tunnel_number.toml created."
+  echo "Client TOML file tu$tunnel_number.toml created."
 }
 
-# Function to create a systemd service for each tunnel
+# Function to create a systemd service for each client tunnel
 create_service() {
   service_name=$1
   toml_file=$2
@@ -95,7 +65,7 @@ menu() {
   echo "Please select an option:"
   echo "1) Install Core"
   echo "2) Iran"
-  echo "3) Abroad"
+  echo "3) Kharej"
   echo "4) Full removal"
 }
 
@@ -137,17 +107,15 @@ while true; do
       done
       ;;
     3)
-      echo "Abroad selected."
-      download_and_extract_zip "https://github.com/0fariid0/bakulme/raw/main/kh.zip" "kh.zip"
+      echo "Kharej selected."
+      read -p "Enter the tunnel number: " tunnel_number
+      read -p "Enter the Iran IP: " ip_ir
 
-      read -p "Enter abroad number (1 to 6): " external_number
-      if [[ $external_number =~ ^[1-6]$ ]]; then
-        service_name="backhaul-tu$external_number"
-        toml_file="tu$external_number.toml"
-        create_service $service_name $toml_file
-      else
-        echo "Invalid number! Please enter a number between 1 and 6."
-      fi
+      # Create the client TOML file for the tunnel
+      create_client_toml_file $tunnel_number $ip_ir
+
+      # Create and start the corresponding systemd service
+      create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       ;;
     4)
       echo "Full removal selected."
