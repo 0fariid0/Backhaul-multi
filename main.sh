@@ -131,7 +131,10 @@ monitor_tunnels() {
         sleep 5
     done
 }
-
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+    SERVER_COUNTRY=$(curl -sS "http://ip-api.com/json/$SERVER_IP" | jq -r '.country')
+    SERVER_ISP=$(curl -sS "http://ip-api.com/json/$SERVER_IP" | jq -r '.isp')
+    BACK_CORE=$(DVHOST_CLOUD_check_status)
 # Main menu function
 menu() {
     echo "+--------------------------------------------------------------------------------------------------------------------------------------+" 
