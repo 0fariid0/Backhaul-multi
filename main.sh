@@ -1,7 +1,21 @@
 #!/bin/bash
 
-# Define the token
-TOKEN="adfadlkadgkgad"
+# Function to install prerequisites and update/upgrade the system
+install_prerequisites() {
+  echo "Updating and upgrading the system..."
+  sudo apt-get update -y && sudo apt-get upgrade -y
+
+  echo "Installing necessary packages: wget, tcpdump, systemctl..."
+  sudo apt-get install wget tcpdump -y
+
+  # Check if systemctl is available, systemctl should be part of most modern systems
+  if ! command -v systemctl &> /dev/null; then
+    echo "Error: systemctl is required but not installed. Exiting..."
+    exit 1
+  fi
+
+  echo "Prerequisites installed."
+}
 
 # Function to download a single file
 download_file() {
@@ -20,15 +34,16 @@ download_file() {
 create_toml_file() {
   tunnel_number=$1
   port_list=$2
+  token=$3
   bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [server]
 bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
-token = "$TOKEN"
+token = "$token"
 channel_size = 2048
-connection_pool = 32
+connection_pool = 16
 nodelay = false
 ports = [
 $port_list
@@ -41,13 +56,14 @@ EOF
 create_client_toml_file() {
   tunnel_number=$1
   ip_ir=$2
+  token=$3
   remote_port=$((1000 + tunnel_number)) # Example: remote_addr starts from port 1001
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [client]
 remote_addr = "$ip_ir:$remote_port"
 transport = "tcp"
-token = "$TOKEN"
+token = "$token"
 nodelay = false
 EOF
   echo "Client TOML file tu$tunnel_number.toml created."
@@ -121,7 +137,8 @@ monitor_tunnels() {
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        echo "-----------------------------------------------------------------------"
+        printf "    Active since: %s\n" "$active_since"
+        echo "---------------------------------------------"
       else
         echo "Tunnel $i: Service not found or inactive"
         echo "---------------------------------------------"
@@ -163,6 +180,7 @@ while true; do
     2)
       echo "Iran selected."
       read -p "How many tunnels do you want to create? " tunnel_count
+      read -p "Enter the token for Iran tunnels: " token
 
       for i in $(seq 1 $tunnel_count); do
         echo "For tunnel $i, please enter the ports (e.g., 8080, 38753):"
@@ -172,7 +190,7 @@ while true; do
         port_list=$(convert_ports_to_toml_format "$ports")
 
         # Create the TOML file for this tunnel
-        create_toml_file $i "$port_list"
+        create_toml_file $i "$port_list" "$token"
 
         # Create and start the corresponding systemd service
         create_service "backhaul-tu$i" "tu$i.toml"
@@ -182,6 +200,7 @@ while true; do
       echo "Kharej selected."
       read -p "Enter the tunnel number: " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
+      read -p "Enter the token for Kharej tunnel: " token
 
       # Validate input
       if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
@@ -195,7 +214,7 @@ while true; do
       fi
 
       # Create the client TOML file for the tunnel
-      create_client_toml_file $tunnel_number $ip_ir
+      create_client_toml_file $tunnel_number $ip_ir "$token"
 
       # Create and start the corresponding systemd service
       create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
