@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Define the token
+TOKEN="adfadlkadgkgad"
+
 # Function to download a single file
 download_file() {
   url=$1
@@ -23,7 +26,7 @@ create_toml_file() {
 [server]
 bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
-token = "adfadlkadgkgad"
+token = "$TOKEN"
 channel_size = 2048
 connection_pool = 16
 nodelay = false
@@ -44,7 +47,7 @@ create_client_toml_file() {
 [client]
 remote_addr = "$ip_ir:$remote_port"
 transport = "tcp"
-token = "Farid@1380"
+token = "$TOKEN"
 nodelay = false
 EOF
   echo "Client TOML file tu$tunnel_number.toml created."
@@ -81,6 +84,12 @@ EOF
   echo "Service $service_name started."
 }
 
+# Function to monitor the status of tunnels
+monitor_tunnels() {
+  echo "Monitoring tunnel services..."
+  watch -n 5 'systemctl status backhaul-tu* | grep "Active:"'
+}
+
 # Main menu function
 menu() {
   echo "Please select an option:"
@@ -88,6 +97,7 @@ menu() {
   echo "2) Iran"
   echo "3) Kharej"
   echo "4) Full removal"
+  echo "5) Monitoring"
 }
 
 # Main loop
@@ -167,6 +177,10 @@ while true; do
 
       sudo systemctl daemon-reload
       echo "All files and services removed."
+      ;;
+    5)
+      echo "Monitoring selected."
+      monitor_tunnels
       ;;
     *)
       echo "Invalid choice!"
