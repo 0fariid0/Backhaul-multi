@@ -94,13 +94,15 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-  
+
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
     # Remove any leading or trailing spaces
     port=$(echo "$port" | awk '{$1=$1;print}')
-    port_list+="\"$port=$port\",\n"
+    if [[ -n $port ]]; then
+      port_list+="\"$port=$port\",\n"
+    fi
   done
   
   # Remove trailing comma and newline
