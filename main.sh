@@ -84,6 +84,21 @@ EOF
   echo "Service $service_name started."
 }
 
+# Function to convert port list to TOML format
+convert_ports_to_toml_format() {
+  ports=$1
+  port_list=""
+  
+  # Convert each port to the format source_port=destination_port
+  IFS=',' read -ra PORTS_ARR <<< "$ports"
+  for port in "${PORTS_ARR[@]}"; do
+    port_list+="\"$port=$port\",\n"
+  done
+  port_list=${port_list%,}  # Remove trailing comma
+
+  echo -e "$port_list"
+}
+
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
@@ -119,16 +134,11 @@ while true; do
       read -p "How many tunnels do you want to create? " tunnel_count
 
       for i in $(seq 1 $tunnel_count); do
-        echo "For tunnel $i, please enter the ports (e.g., 8080=8080, 38753=38753):"
+        echo "For tunnel $i, please enter the ports (e.g., 8080, 38753):"
         read -p "Ports for tunnel $i: " ports
-        port_list=""
         
-        # Create port list with proper formatting for TOML
-        IFS=',' read -ra PORTS_ARR <<< "$ports"
-        for port in "${PORTS_ARR[@]}"; do
-          port_list+="\"$port\",\n"
-        done
-        port_list=${port_list%,}  # Remove trailing comma
+        # Convert ports to TOML format
+        port_list=$(convert_ports_to_toml_format "$ports")
 
         # Create the TOML file for this tunnel
         create_toml_file $i "$port_list"
