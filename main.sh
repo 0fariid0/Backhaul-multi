@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Define a default token (can be overridden by user input)
-DEFAULT_TOKEN="adfadlkadgkgad"
-
 # Function to update and upgrade the system
 update_system() {
   echo "Updating and upgrading the system..."
@@ -94,22 +91,17 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-
+  
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
-    # Remove any leading or trailing spaces
-    port=$(echo "$port" | awk '{$1=$1;print}')
-    if [[ -n $port ]]; then
-      port_list+="\"$port=$port\",\n"
-    fi
+    port_list+="\"$port=$port\",\n"
   done
+  port_list=${port_list%,}  # Remove trailing comma and newline
   
-  # Remove trailing comma and newline
-  port_list=$(echo "$port_list" | awk '{gsub(/,\n$/, ""); print}')
-  
-  echo -e "$port_list"
+  echo -e "$port_list" | sed '$ s/,$//'
 }
+
 
 # Function to monitor the status of tunnels
 monitor_tunnels() {
@@ -133,7 +125,6 @@ monitor_tunnels() {
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        printf "    Active since: %s\n" "$active_since"
         echo "---------------------------------------------"
       fi
     done
@@ -231,7 +222,7 @@ while true; do
       ;;
     3)
       echo "Kharej selected."
-      read -p "Enter the tunnel number (1-10): " tunnel_number
+      read -p "Enter the tunnel number: " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
 
       # Validate input
@@ -260,11 +251,9 @@ while true; do
 
       case $removal_choice in
         1)
-          read -p "Enter the token: " TOKEN
           remove_single_tunnel
           ;;
         2)
-          read -p "Enter the token: " TOKEN
           remove_all_tunnels
           ;;
         *)
