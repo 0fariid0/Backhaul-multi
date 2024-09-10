@@ -1,6 +1,10 @@
 #!/bin/bash
 
-
+# Function to update and upgrade the system
+update_system() {
+  echo "Updating and upgrading the system..."
+  apt update && apt upgrade -y
+}
 
 # Function to download a single file
 download_file() {
@@ -219,6 +223,7 @@ while true; do
       ;;
     3)
       echo "Kharej selected."
+      read -p "Enter the token for tunnels: " TOKEN
       read -p "Enter the tunnel number: " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
 
