@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Update and install dependencies
-echo "Updating and installing dependencies..."
-sudo apt-get update -y && sudo apt-get upgrade -y
-sudo apt-get install wget tcpdump bc -y
 
 # Function to download a single file
 download_file() {
@@ -244,6 +240,7 @@ while true; do
             create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
             ;;
         4)
+            echo "Removal selected."
             removal_menu
             read -p "Your choice: " removal_choice
 
@@ -255,7 +252,7 @@ while true; do
                     remove_all_tunnels
                     ;;
                 *)
-                    echo "Invalid removal choice!"
+                    echo "Invalid choice!"
                     ;;
             esac
             ;;
@@ -266,3 +263,5 @@ while true; do
         *)
             echo "Invalid choice!"
             ;;
+    esac
+done
