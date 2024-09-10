@@ -1,5 +1,7 @@
 #!/bin/bash
 
+
+
 # Function to download a single file
 download_file() {
   url=$1
@@ -85,13 +87,13 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-
+  
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for i in "${!PORTS_ARR[@]}"; do
     port="${PORTS_ARR[$i]}"
     port_list+="\"$port=$port\""
-
+    
     # Add comma and newline only if it's not the last port
     if [[ $i -lt $((${#PORTS_ARR[@]} - 1)) ]]; then
       port_list+=",\n"
@@ -101,6 +103,7 @@ convert_ports_to_toml_format() {
   # Print the port list
   echo -e "$port_list"
 }
+
 
 # Function to monitor the status of tunnels
 monitor_tunnels() {
@@ -115,30 +118,17 @@ monitor_tunnels() {
     clear
     echo "Tunnel Service Status:"
     echo "---------------------------------------------"
-    
     for i in {1..10}; do
       service_name="backhaul-tu$i"
-      
-      # Check the status of the service
-      status_output=$(sudo systemctl status $service_name 2>&1)
-      
-      # Extract relevant status info
-      status=$(echo "$status_output" | grep "Active:")
+      status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
+
       if [[ -n $status ]]; then
         active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
         echo "---------------------------------------------"
-      else
-        # If service status not found
-        echo "Tunnel $i: Service not found or inactive."
-        echo "---------------------------------------------"
       fi
-      
-      # Print the full status output
-      echo "$status_output"
-      echo "---------------------------------------------"
     done
 
     sleep 10
@@ -148,7 +138,6 @@ monitor_tunnels() {
     fi
   done
 }
-
 
 # Function to remove a single tunnel
 remove_single_tunnel() {
@@ -173,7 +162,7 @@ remove_single_tunnel() {
 # Function to remove all tunnels
 remove_all_tunnels() {
   echo "Removing all tunnels..."
-
+  
   # Stop and disable all services
   for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
