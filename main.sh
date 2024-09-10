@@ -72,7 +72,7 @@ EOF
   echo "Service $service_name started."
 }
 
-# Function to monitor bandwidth
+# Function to monitor bandwidth using vnstat
 monitor_bandwidth() {
   echo "Monitoring bandwidth..."
   while true; do
@@ -88,23 +88,19 @@ monitor_bandwidth() {
       if [[ $status == "active" ]]; then
         echo -n "Tunnel $i: "
         
-        # Define the ports for this tunnel (you need to update these as necessary)
-        case $i in
-          1) ports="8080,38753" ;;
-          2) ports="9090,47753" ;;
-          3) ports="10080,56753" ;;
-          4) ports="20080,67753" ;;
-          5) ports="30080,78753" ;;
-          6) ports="40080,89753" ;;
-        esac
+        # Define the network interface for this tunnel
+        # Replace `eth0` with the actual network interface used by the tunnel
+        interface="eth0"
         
-        # Get the bandwidth usage for the specified ports
-        total_rx=$(tcpdump -i any -nn -tttt -c 1000 | grep -Eo "(\d+\.\d+\.\d+\.\d+:[0-9]+)" | grep -E -o ":[0-9]+" | awk -F: '{print $2}' | grep -E "^($ports)$" | awk '{s+=$1} END {print s}')
+        # Get bandwidth usage for the interface
+        rx_rate=$(vnstat -i $interface -tr | grep "rx:" | awk '{print $2}')
+        tx_rate=$(vnstat -i $interface -tr | grep "tx:" | awk '{print $2}')
         
         # Convert to megabits per second (1 byte = 8 bits)
-        total_rx_mbps=$(echo "scale=2; $total_rx / 1024 / 1024 * 8" | bc)
+        rx_rate_mbps=$(echo "scale=2; $rx_rate / 1024 * 8" | bc)
+        tx_rate_mbps=$(echo "scale=2; $tx_rate / 1024 * 8" | bc)
         
-        echo "Bandwidth: ${total_rx_mbps} Mbps"
+        echo "Bandwidth - RX: ${rx_rate_mbps} Mbps, TX: ${tx_rate_mbps} Mbps"
         echo "---------------------------------------------"
       else
         echo "Tunnel $i: Service not running"
