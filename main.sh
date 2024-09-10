@@ -13,6 +13,27 @@ download_file() {
   echo "Download of $output completed."
 }
 
+# Function to create a TOML file for each tunnel
+create_toml_file() {
+  tunnel_number=$1
+  port_list=$2
+  bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
+
+  cat <<EOF > /root/tu$tunnel_number.toml
+[server]
+bind_addr = "0.0.0.0:$bind_port"
+transport = "tcp"
+token = "adfadlkadgkgad"
+channel_size = 2048
+connection_pool = 16
+nodelay = false
+ports = [
+$port_list
+]
+EOF
+  echo "TOML file tu$tunnel_number.toml created."
+}
+
 # Function to create a client TOML file for each tunnel
 create_client_toml_file() {
   tunnel_number=$1
@@ -29,7 +50,7 @@ EOF
   echo "Client TOML file tu$tunnel_number.toml created."
 }
 
-# Function to create a systemd service for each client tunnel
+# Function to create a systemd service for each tunnel
 create_service() {
   service_name=$1
   toml_file=$2
@@ -110,6 +131,17 @@ while true; do
       echo "Kharej selected."
       read -p "Enter the tunnel number: " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
+
+      # Validate input
+      if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+        echo "Invalid tunnel number! Please enter a number between 1 and 6."
+        continue
+      fi
+
+      if [[ -z $ip_ir ]]; then
+        echo "IP address cannot be empty!"
+        continue
+      fi
 
       # Create the client TOML file for the tunnel
       create_client_toml_file $tunnel_number $ip_ir
