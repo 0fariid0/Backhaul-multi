@@ -102,6 +102,12 @@ convert_ports_to_toml_format() {
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
+  
+  # Set up a trap to handle Ctrl+C
+  trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
+
+  return_to_menu=false
+
   while true; do
     clear
     echo "Tunnel Service Status:"
@@ -115,13 +121,18 @@ monitor_tunnels() {
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        echo "---------------------------------------------------------------------"
+        echo "-----------------------------------------------------------------------"
       else
         echo "Tunnel $i: Service not found or inactive"
         echo "---------------------------------------------"
       fi
     done
-    sleep 5
+
+    sleep 1
+    
+    if [[ $return_to_menu == true ]]; then
+      break
+    fi
   done
 }
 
