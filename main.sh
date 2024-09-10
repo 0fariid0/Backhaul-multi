@@ -1,12 +1,50 @@
 #!/bin/bash
 
+# Function to download a single file
+download_file() {
+  url=$1
+  output=$2
+  echo "Downloading $output..."
+  wget $url -O $output
+  if [[ $? -ne 0 ]]; then
+    echo "Error downloading $output."
+    exit 1
+  fi
+  echo "Download of $output completed."
+}
+
+# Function to download and extract ZIP files
+download_and_extract_zip() {
+  url=$1
+  output=$2
+  echo "Downloading $output..."
+  wget $url -O $output
+  if [[ $? -ne 0 ]]; then
+    echo "Error downloading $output."
+    exit 1
+  fi
+  echo "Download of $output completed."
+
+  echo "Extracting $output..."
+  unzip $output
+  if [[ $? -eq 0 ]]; then
+    echo "Extraction of $output completed."
+    echo "Removing the ZIP file $output..."
+    rm -f $output
+    echo "$output removed."
+  else
+    echo "Error extracting $output."
+    exit 1
+  fi
+}
+
 # Function to create a TOML file for each tunnel
 create_toml_file() {
   tunnel_number=$1
   port_list=$2
   bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
 
-  cat <<EOF > tu$tunnel_number.toml
+  cat <<EOF > /root/tu$tunnel_number.toml
 [server]
 bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
@@ -115,14 +153,15 @@ while true; do
       echo "Full removal selected."
       echo "Removing files and services..."
 
+      # Remove the backhaul executable
       [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
-      [[ -f "ir.zip" ]] && rm -f ir.zip && echo "ir.zip removed."
-      [[ -f "kh.zip" ]] && rm -f kh.zip && echo "kh.zip removed."
 
+      # Remove services and TOML files for each tunnel
       for i in {1..6}; do
         sudo systemctl stop backhaul-tu$i.service
         sudo systemctl disable backhaul-tu$i.service
-        rm /etc/systemd/system/backhaul-tu$i.service
+        rm -f /etc/systemd/system/backhaul-tu$i.service
+        [[ -f "/root/tu$i.toml" ]] && rm -f /root/tu$i.toml && echo "File tu$i.toml removed."
         echo "Service backhaul-tu$i removed."
       done
 
