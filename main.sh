@@ -1,7 +1,5 @@
 #!/bin/bash
 
-
-
 # Function to download a single file
 download_file() {
   url=$1
@@ -87,13 +85,13 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-  
+
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for i in "${!PORTS_ARR[@]}"; do
     port="${PORTS_ARR[$i]}"
     port_list+="\"$port=$port\""
-    
+
     # Add comma and newline only if it's not the last port
     if [[ $i -lt $((${#PORTS_ARR[@]} - 1)) ]]; then
       port_list+=",\n"
@@ -104,11 +102,10 @@ convert_ports_to_toml_format() {
   echo -e "$port_list"
 }
 
-
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
-  
+
   # Set up a trap to handle Ctrl+C
   trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
 
@@ -118,6 +115,7 @@ monitor_tunnels() {
     clear
     echo "Tunnel Service Status:"
     echo "---------------------------------------------"
+
     for i in {1..10}; do
       service_name="backhaul-tu$i"
       status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
@@ -127,12 +125,20 @@ monitor_tunnels() {
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
+
+        # Get the detailed status of the service
+        detailed_status=$(systemctl status $service_name 2>/dev/null)
+        echo "Details:"
+        echo "$detailed_status" | grep -E 'Main PID:|CGroup:'
+        echo "---------------------------------------------"
+      else
+        echo "Tunnel $i: Service not found or inactive."
         echo "---------------------------------------------"
       fi
     done
 
     sleep 1
-    
+
     if [[ $return_to_menu == true ]]; then
       break
     fi
@@ -162,7 +168,7 @@ remove_single_tunnel() {
 # Function to remove all tunnels
 remove_all_tunnels() {
   echo "Removing all tunnels..."
-  
+
   # Stop and disable all services
   for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
