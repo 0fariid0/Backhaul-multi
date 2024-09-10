@@ -1,6 +1,7 @@
 #!/bin/bash
 
 
+
 # Function to download a single file
 download_file() {
   url=$1
@@ -93,8 +94,8 @@ convert_ports_to_toml_format() {
     port_list+="\"$port=$port\",\n"
   done
 
-  # Remove trailing comma and newline
-  port_list=$(echo -e "$port_list" | sed '$ s/,$//')
+  # Remove trailing comma and newline from the last entry
+  port_list=$(echo -e "$port_list" | sed 's/,\n$//')
 
   echo -e "$port_list"
 }
