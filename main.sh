@@ -90,15 +90,20 @@ convert_ports_to_toml_format() {
   
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
-  for port in "${PORTS_ARR[@]}"; do
-    port_list+="\"$port=$port\",\n"
+  for i in "${!PORTS_ARR[@]}"; do
+    port="${PORTS_ARR[$i]}"
+    port_list+="\"$port=$port\""
+    
+    # Add comma and newline only if it's not the last port
+    if [[ $i -lt $((${#PORTS_ARR[@]} - 1)) ]]; then
+      port_list+=",\n"
+    fi
   done
 
-  # Remove trailing comma and newline from the last entry
-  port_list=$(echo -e "$port_list" | sed 's/,\n$//')
-
+  # Print the port list
   echo -e "$port_list"
 }
+
 
 # Function to monitor the status of tunnels
 monitor_tunnels() {
