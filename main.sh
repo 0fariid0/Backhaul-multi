@@ -1,64 +1,54 @@
 #!/bin/bash
 
-# Define the token
-TOKEN="adfadlkadgkgad"
+# Define the output file
+OUTPUT_FILE="/root/tunnel_bandwidth.log"
 
-# Function to download a single file
-download_file() {
-  url=$1
-  output=$2
-  echo "Downloading $output..."
-  wget $url -O $output
-  if [[ $? -ne 0 ]]; then
-    echo "Error downloading $output."
-    exit 1
-  fi
-  echo "Download of $output completed."
+# Function to convert ports to TOML format
+convert_ports_to_toml_format() {
+  local ports_str="$1"
+  local formatted_ports=""
+  IFS=',' read -r -a ports <<< "$ports_str"
+  for port in "${ports[@]}"; do
+    formatted_ports+="$port=$port\",\n"
+  done
+  echo "[\"${formatted_ports%,}]"
 }
 
-# Function to create a TOML file for each tunnel
+# Function to create a TOML file for a given tunnel
 create_toml_file() {
-  tunnel_number=$1
-  port_list=$2
-  bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
+  local tunnel_number=$1
+  local ports=$2
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [server]
-bind_addr = "0.0.0.0:$bind_port"
+bind_addr = "0.0.0.0:100$tunnel_number"
 transport = "tcp"
-token = "$TOKEN"
+token = "adfadlkadgkgad"
 channel_size = 2048
 connection_pool = 16
 nodelay = false
-ports = [
-$port_list
-]
+ports = $ports
 EOF
-  echo "TOML file tu$tunnel_number.toml created."
 }
 
-# Function to create a client TOML file for each tunnel
+# Function to create a client TOML file for a given tunnel
 create_client_toml_file() {
-  tunnel_number=$1
-  ip_ir=$2
-  remote_port=$((1000 + tunnel_number)) # Example: remote_addr starts from port 1001
+  local tunnel_number=$1
+  local ip_ir=$2
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [client]
-remote_addr = "$ip_ir:$remote_port"
+remote_addr = "$ip_ir:100$tunnel_number"
 transport = "tcp"
-token = "$TOKEN"
+token = "Farid@1380"
 nodelay = false
 EOF
-  echo "Client TOML file tu$tunnel_number.toml created."
 }
 
-# Function to create a systemd service for each tunnel
+# Function to create and start a systemd service for a given TOML file
 create_service() {
-  service_name=$1
-  toml_file=$2
-
-  echo "Creating service for $toml_file..."
+  local service_name=$1
+  local toml_file=$2
 
   cat <<EOF > /etc/systemd/system/$service_name.service
 [Unit]
@@ -76,53 +66,53 @@ LimitNOFILE=1048576
 WantedBy=multi-user.target
 EOF
 
-  echo "Service $service_name created."
-
   sudo systemctl daemon-reload
   sudo systemctl enable $service_name.service
   sudo systemctl start $service_name.service
   echo "Service $service_name started."
 }
 
-# Function to convert port list to TOML format
-convert_ports_to_toml_format() {
-  ports=$1
-  port_list=""
-  
-  # Convert each port to the format source_port=destination_port
-  IFS=',' read -ra PORTS_ARR <<< "$ports"
-  for port in "${PORTS_ARR[@]}"; do
-    port_list+="\"$port=$port\",\n"
-  done
-  port_list=${port_list%,}  # Remove trailing comma
-
-  echo -e "$port_list"
-}
-
-# Function to monitor the status of tunnels
-monitor_tunnels() {
-  echo "Monitoring tunnel services..."
+# Function to monitor bandwidth
+monitor_bandwidth() {
+  echo "Monitoring bandwidth..."
   while true; do
     clear
     echo "Tunnel Service Status:"
     echo "---------------------------------------------"
+    
     for i in {1..6}; do
       service_name="backhaul-tu$i"
-      status=$(systemctl status $service_name | grep "Active:")
-
-      if [[ -n $status ]]; then
-        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
-        uptime=$(echo $status | sed -n 's/.*since \(.*\); \(.*\) ago/\2/p')
-
-        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        printf "    Active since: %s\n" "$active_since"
+      
+      # Check if the service is active
+      status=$(systemctl is-active $service_name)
+      if [[ $status == "active" ]]; then
+        echo -n "Tunnel $i: "
+        
+        # Define the ports for this tunnel (you need to update these as necessary)
+        case $i in
+          1) ports="8080,38753" ;;
+          2) ports="9090,47753" ;;
+          3) ports="10080,56753" ;;
+          4) ports="20080,67753" ;;
+          5) ports="30080,78753" ;;
+          6) ports="40080,89753" ;;
+        esac
+        
+        # Get the bandwidth usage for the specified ports
+        total_rx=$(tcpdump -i any -nn -tttt -c 1000 | grep -Eo "(\d+\.\d+\.\d+\.\d+:[0-9]+)" | grep -E -o ":[0-9]+" | awk -F: '{print $2}' | grep -E "^($ports)$" | awk '{s+=$1} END {print s}')
+        
+        # Convert to megabits per second (1 byte = 8 bits)
+        total_rx_mbps=$(echo "scale=2; $total_rx / 1024 / 1024 * 8" | bc)
+        
+        echo "Bandwidth: ${total_rx_mbps} Mbps"
         echo "---------------------------------------------"
       else
-        echo "Tunnel $i: Service not found or inactive"
+        echo "Tunnel $i: Service not running"
         echo "---------------------------------------------"
       fi
     done
-    sleep 5
+
+    sleep 1
   done
 }
 
@@ -210,8 +200,7 @@ while true; do
       echo "All files and services removed."
       ;;
     5)
-      echo "Monitoring selected."
-      monitor_tunnels
+      monitor_bandwidth
       ;;
     *)
       echo "Invalid choice!"
