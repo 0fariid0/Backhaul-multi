@@ -1,6 +1,7 @@
 #!/bin/bash
 
 
+
 # Function to download a single file
 download_file() {
   url=$1
