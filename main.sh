@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Function to update and upgrade the system
-update_system() {
-  echo "Updating and upgrading the system..."
-  apt update && apt upgrade -y
-}
 
 # Function to download a single file
 download_file() {
