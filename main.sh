@@ -115,8 +115,7 @@ monitor_tunnels() {
         uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
         printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        printf "    Active since: %s\n" "$active_since"
-        echo "---------------------------------------------"
+        echo "---------------------------------------------------------------------"
       else
         echo "Tunnel $i: Service not found or inactive"
         echo "---------------------------------------------"
