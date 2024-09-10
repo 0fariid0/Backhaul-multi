@@ -119,25 +119,36 @@ monitor_tunnels() {
     for i in {1..10}; do
       service_name="backhaul-tu$i"
       
-      # Use systemctl to get the status of the service
-      if systemctl is-active --quiet $service_name; then
-        status=$(sudo systemctl status $service_name --no-pager)
-        echo "Tunnel $i: Active"
-        echo "$status" | grep -E 'Active:|Main PID:|CGroup:'
-      else
-        echo "Tunnel $i: Inactive or not found"
-      fi
+      # Check the status of the service
+      status_output=$(sudo systemctl status $service_name 2>&1)
+      
+      # Extract relevant status info
+      status=$(echo "$status_output" | grep "Active:")
+      if [[ -n $status ]]; then
+        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
+        uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
+        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
+        echo "---------------------------------------------"
+      else
+        # If service status not found
+        echo "Tunnel $i: Service not found or inactive."
+        echo "---------------------------------------------"
+      fi
+      
+      # Print the full status output
+      echo "$status_output"
       echo "---------------------------------------------"
     done
 
     sleep 10
-
+    
     if [[ $return_to_menu == true ]]; then
       break
     fi
   done
 }
+
 
 # Function to remove a single tunnel
 remove_single_tunnel() {
