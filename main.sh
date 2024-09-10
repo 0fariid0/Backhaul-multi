@@ -28,7 +28,7 @@ bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
 token = "$TOKEN"
 channel_size = 2048
-connection_pool = 16
+connection_pool = 32
 nodelay = false
 ports = [
 $port_list
