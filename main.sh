@@ -92,11 +92,12 @@ convert_ports_to_toml_format() {
   for port in "${PORTS_ARR[@]}"; do
     port_list+="\"$port=$port\",\n"
   done
-  port_list=${port_list%,}  # Remove trailing comma and newline
-  
-  echo -e "$port_list" | sed '$ s/,$//'
-}
 
+  # Remove trailing comma and newline
+  port_list=$(echo -e "$port_list" | sed '$ s/,$//')
+
+  echo -e "$port_list"
+}
 
 # Function to monitor the status of tunnels
 monitor_tunnels() {
