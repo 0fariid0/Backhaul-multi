@@ -98,6 +98,7 @@ convert_ports_to_toml_format() {
     port_list+="\"$port=$port\",\n"
   done
   port_list=${port_list%,}  # Remove trailing comma
+  port_list=$(echo "$port_list" | sed 's/,$//')  # Remove any trailing comma that may be left
 
   echo -e "$port_list"
 }
