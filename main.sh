@@ -105,19 +105,21 @@ monitor_tunnels() {
   while true; do
     clear
     echo "Tunnel Service Status:"
+    echo "---------------------------------------------"
     for i in {1..6}; do
       service_name="backhaul-tu$i"
       status=$(systemctl status $service_name | grep "Active:")
-      
+
       if [[ -n $status ]]; then
         active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
         uptime=$(echo $status | sed -n 's/.*since \(.*\); \(.*\) ago/\2/p')
-        
-        echo "Tunnel $i: $status"
-        echo "    Active since: $active_since"
-        echo "    Uptime: $uptime"
+
+        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
+        printf "    Active since: %s\n" "$active_since"
+        echo "---------------------------------------------"
       else
         echo "Tunnel $i: Service not found or inactive"
+        echo "---------------------------------------------"
       fi
     done
     sleep 5
