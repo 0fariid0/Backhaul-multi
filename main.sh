@@ -28,7 +28,7 @@ bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
 token = "$TOKEN"
 channel_size = 2048
-connection_pool = 32
+connection_pool = 16
 nodelay = false
 ports = [
 $port_list
@@ -99,9 +99,9 @@ convert_ports_to_toml_format() {
   echo -e "$port_list"
 }
 
-# Function to monitor the status of tunnels
+# Function to monitor the status of active tunnels
 monitor_tunnels() {
-  echo "Monitoring tunnel services..."
+  echo "Monitoring active tunnel services..."
 
   # Set up a trap to handle Ctrl+C
   trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
@@ -110,20 +110,18 @@ monitor_tunnels() {
 
   while true; do
     clear
-    echo "Tunnel Service Status:"
+    echo "Active Tunnel Service Status:"
     echo "---------------------------------------------"
-    for i in {1..6}; do
+    for i in {1..10}; do
       service_name="backhaul-tu$i"
-      status=$(systemctl status $service_name | grep "Active:")
+      status=$(systemctl is-active $service_name)
 
-      if [[ -n $status ]]; then
-        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
-        uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
+      if [[ $status == "active" ]]; then
+        active_since=$(systemctl show -p ActiveEnterTimestamp $service_name | sed 's/ActiveEnterTimestamp=//')
+        uptime=$(systemctl show -p Uptime $service_name | sed 's/Uptime=//')
 
-        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-        echo "---------------------------------------------"
-      else
-        echo "Tunnel $i: Service not found or inactive"
+        printf "Tunnel %-2d: %-10s %s\n" $i "$status" "$uptime"
+        printf "    Active since: %s\n" "$active_since"
         echo "---------------------------------------------"
       fi
     done
@@ -140,8 +138,8 @@ monitor_tunnels() {
 remove_single_tunnel() {
   read -p "Enter the tunnel number to remove: " tunnel_number
 
-  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+  if [[ ! $tunnel_number =~ ^[1-10]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
 
@@ -160,7 +158,7 @@ remove_all_tunnels() {
   echo "Removing all tunnels..."
 
   # Remove services and TOML files for each tunnel
-  for i in {1..6}; do
+  for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
     sudo systemctl disable backhaul-tu$i.service
     rm -f /etc/systemd/system/backhaul-tu$i.service
@@ -207,6 +205,11 @@ while true; do
       echo "Iran selected."
       read -p "How many tunnels do you want to create? " tunnel_count
 
+      if [[ $tunnel_count -gt 10 ]]; then
+        echo "The maximum number of tunnels is 10."
+        continue
+      fi
+
       for i in $(seq 1 $tunnel_count); do
         echo "For tunnel $i, please enter the ports (e.g., 8080, 38753):"
         read -p "Ports for tunnel $i: " ports
@@ -227,8 +230,8 @@ while true; do
       read -p "Enter the Iran IP: " ip_ir
 
       # Validate input
-      if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-        echo "Invalid tunnel number! Please enter a number between 1 and 6."
+      if [[ ! $tunnel_number =~ ^[1-10]$ ]]; then
+        echo "Invalid tunnel number! Please enter a number between 1 and 10."
         continue
       fi
 
