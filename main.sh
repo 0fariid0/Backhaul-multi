@@ -88,7 +88,7 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-  
+
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
@@ -102,7 +102,7 @@ convert_ports_to_toml_format() {
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
-  
+
   # Set up a trap to handle Ctrl+C
   trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
 
@@ -129,11 +129,47 @@ monitor_tunnels() {
     done
 
     sleep 1
-    
+
     if [[ $return_to_menu == true ]]; then
       break
     fi
   done
+}
+
+# Function to remove a single tunnel
+remove_single_tunnel() {
+  read -p "Enter the tunnel number to remove: " tunnel_number
+
+  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+    return
+  fi
+
+  # Stop and disable the service for the specified tunnel
+  sudo systemctl stop backhaul-tu$tunnel_number.service
+  sudo systemctl disable backhaul-tu$tunnel_number.service
+  rm -f /etc/systemd/system/backhaul-tu$tunnel_number.service
+  [[ -f "/root/tu$tunnel_number.toml" ]] && rm -f /root/tu$tunnel_number.toml && echo "File tu$tunnel_number.toml removed."
+  echo "Service backhaul-tu$tunnel_number removed."
+
+  sudo systemctl daemon-reload
+}
+
+# Function to remove all tunnels
+remove_all_tunnels() {
+  echo "Removing all tunnels..."
+
+  # Remove services and TOML files for each tunnel
+  for i in {1..6}; do
+    sudo systemctl stop backhaul-tu$i.service
+    sudo systemctl disable backhaul-tu$i.service
+    rm -f /etc/systemd/system/backhaul-tu$i.service
+    [[ -f "/root/tu$i.toml" ]] && rm -f /root/tu$i.toml && echo "File tu$i.toml removed."
+    echo "Service backhaul-tu$i removed."
+  done
+
+  sudo systemctl daemon-reload
+  echo "All tunnels removed."
 }
 
 # Main menu function
@@ -142,8 +178,15 @@ menu() {
   echo "1) Install Core"
   echo "2) Iran"
   echo "3) Kharej"
-  echo "4) Full removal"
+  echo "4) Removal"
   echo "5) Monitoring"
+}
+
+# Submenu for removal
+removal_menu() {
+  echo "Select removal option:"
+  echo "1) Remove single tunnel"
+  echo "2) Remove all tunnels"
 }
 
 # Main loop
@@ -201,23 +244,21 @@ while true; do
       create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       ;;
     4)
-      echo "Full removal selected."
-      echo "Removing files and services..."
+      echo "Removal selected."
+      removal_menu
+      read -p "Your choice: " removal_choice
 
-      # Remove the backhaul executable
-      [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
-
-      # Remove services and TOML files for each tunnel
-      for i in {1..6}; do
-        sudo systemctl stop backhaul-tu$i.service
-        sudo systemctl disable backhaul-tu$i.service
-        rm -f /etc/systemd/system/backhaul-tu$i.service
-        [[ -f "/root/tu$i.toml" ]] && rm -f /root/tu$i.toml && echo "File tu$i.toml removed."
-        echo "Service backhaul-tu$i removed."
-      done
-
-      sudo systemctl daemon-reload
-      echo "All files and services removed."
+      case $removal_choice in
+        1)
+          remove_single_tunnel
+          ;;
+        2)
+          remove_all_tunnels
+          ;;
+        *)
+          echo "Invalid choice!"
+          ;;
+      esac
       ;;
     5)
       echo "Monitoring selected."
