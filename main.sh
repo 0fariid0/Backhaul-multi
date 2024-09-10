@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Define the token
-TOKEN="adfadlkadgkgad"
+# Function to update and upgrade the system
+update_system() {
+  echo "Updating and upgrading the system..."
+  apt update && apt upgrade -y
+}
 
 # Function to download a single file
 download_file() {
@@ -28,7 +31,7 @@ bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
 token = "$TOKEN"
 channel_size = 2048
-connection_pool = 16
+connection_pool = 32
 nodelay = false
 ports = [
 $port_list
@@ -88,7 +91,7 @@ EOF
 convert_ports_to_toml_format() {
   ports=$1
   port_list=""
-
+  
   # Convert each port to the format source_port=destination_port
   IFS=',' read -ra PORTS_ARR <<< "$ports"
   for port in "${PORTS_ARR[@]}"; do
@@ -99,10 +102,10 @@ convert_ports_to_toml_format() {
   echo -e "$port_list"
 }
 
-# Function to monitor the status of active tunnels
+# Function to monitor the status of tunnels
 monitor_tunnels() {
-  echo "Monitoring active tunnel services..."
-
+  echo "Monitoring tunnel services..."
+  
   # Set up a trap to handle Ctrl+C
   trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
 
@@ -110,24 +113,24 @@ monitor_tunnels() {
 
   while true; do
     clear
-    echo "Active Tunnel Service Status:"
+    echo "Tunnel Service Status:"
     echo "---------------------------------------------"
     for i in {1..10}; do
       service_name="backhaul-tu$i"
-      status=$(systemctl is-active $service_name)
+      status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
 
-      if [[ $status == "active" ]]; then
-        active_since=$(systemctl show -p ActiveEnterTimestamp $service_name | sed 's/ActiveEnterTimestamp=//')
-        uptime=$(systemctl show -p Uptime $service_name | sed 's/Uptime=//')
+      if [[ -n $status ]]; then
+        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
+        uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
 
-        printf "Tunnel %-2d: %-10s %s\n" $i "$status" "$uptime"
+        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
         printf "    Active since: %s\n" "$active_since"
         echo "---------------------------------------------"
       fi
     done
 
     sleep 1
-
+    
     if [[ $return_to_menu == true ]]; then
       break
     fi
@@ -136,9 +139,10 @@ monitor_tunnels() {
 
 # Function to remove a single tunnel
 remove_single_tunnel() {
-  read -p "Enter the tunnel number to remove: " tunnel_number
+  read -p "Enter the tunnel number to remove (1-10): " tunnel_number
 
-  if [[ ! $tunnel_number =~ ^[1-10]$ ]]; then
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
     echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
@@ -156,18 +160,20 @@ remove_single_tunnel() {
 # Function to remove all tunnels
 remove_all_tunnels() {
   echo "Removing all tunnels..."
-
-  # Remove services and TOML files for each tunnel
+  
+  # Stop and disable all services
   for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
     sudo systemctl disable backhaul-tu$i.service
     rm -f /etc/systemd/system/backhaul-tu$i.service
     [[ -f "/root/tu$i.toml" ]] && rm -f /root/tu$i.toml && echo "File tu$i.toml removed."
-    echo "Service backhaul-tu$i removed."
   done
 
+  # Remove the backhaul executable
+  [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
+
   sudo systemctl daemon-reload
-  echo "All tunnels removed."
+  echo "All files and services removed."
 }
 
 # Main menu function
@@ -180,13 +186,6 @@ menu() {
   echo "5) Monitoring"
 }
 
-# Submenu for removal
-removal_menu() {
-  echo "Select removal option:"
-  echo "1) Remove single tunnel"
-  echo "2) Remove all tunnels"
-}
-
 # Main loop
 while true; do
   menu
@@ -195,6 +194,7 @@ while true; do
   case $choice in
     1)
       echo "Install Core selected."
+      update_system
       if [[ ! -f "/root/backhaul" ]]; then
         download_file "https://github.com/0fariid0/bakulme/raw/main/backhaul" "/root/backhaul"
       else
@@ -203,25 +203,21 @@ while true; do
       ;;
     2)
       echo "Iran selected."
-      read -p "How many tunnels do you want to create? " tunnel_count
+      read -p "Enter the token for tunnels: " TOKEN
+      read -p "Enter the tunnel numbers (e.g., 1 5 7): " -a tunnel_numbers
 
-      if [[ $tunnel_count -gt 10 ]]; then
-        echo "The maximum number of tunnels is 10."
-        continue
-      fi
-
-      for i in $(seq 1 $tunnel_count); do
-        echo "For tunnel $i, please enter the ports (e.g., 8080, 38753):"
-        read -p "Ports for tunnel $i: " ports
+      for tunnel_number in "${tunnel_numbers[@]}"; do
+        echo "For tunnel $tunnel_number, please enter the ports (e.g., 8080, 38753):"
+        read -p "Ports for tunnel $tunnel_number: " ports
         
         # Convert ports to TOML format
         port_list=$(convert_ports_to_toml_format "$ports")
 
         # Create the TOML file for this tunnel
-        create_toml_file $i "$port_list"
+        create_toml_file $tunnel_number "$port_list"
 
         # Create and start the corresponding systemd service
-        create_service "backhaul-tu$i" "tu$i.toml"
+        create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       done
       ;;
     3)
@@ -230,7 +226,7 @@ while true; do
       read -p "Enter the Iran IP: " ip_ir
 
       # Validate input
-      if [[ ! $tunnel_number =~ ^[1-10]$ ]]; then
+      if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
         echo "Invalid tunnel number! Please enter a number between 1 and 10."
         continue
       fi
@@ -248,7 +244,9 @@ while true; do
       ;;
     4)
       echo "Removal selected."
-      removal_menu
+      echo "Select removal option:"
+      echo "1) Remove single tunnel"
+      echo "2) Remove all tunnels"
       read -p "Your choice: " removal_choice
 
       case $removal_choice in
