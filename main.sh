@@ -105,7 +105,7 @@ convert_ports_to_toml_format() {
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
-
+  
   # Set up a trap to handle Ctrl+C
   trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
 
@@ -115,29 +115,23 @@ monitor_tunnels() {
     clear
     echo "Tunnel Service Status:"
     echo "---------------------------------------------"
-
+    
     for i in {1..10}; do
       service_name="backhaul-tu$i"
-      status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
-
-      if [[ -n $status ]]; then
-        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
-        uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
-
-        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
-
-        # Get the detailed status of the service
-        detailed_status=$(systemctl status $service_name 2>/dev/null)
-        echo "Details:"
-        echo "$detailed_status" | grep -E 'Main PID:|CGroup:'
-        echo "---------------------------------------------"
+      
+      # Use systemctl to get the status of the service
+      if systemctl is-active --quiet $service_name; then
+        status=$(sudo systemctl status $service_name --no-pager)
+        echo "Tunnel $i: Active"
+        echo "$status" | grep -E 'Active:|Main PID:|CGroup:'
       else
-        echo "Tunnel $i: Service not found or inactive."
-        echo "---------------------------------------------"
+        echo "Tunnel $i: Inactive or not found"
       fi
+
+      echo "---------------------------------------------"
     done
 
-    sleep 1
+    sleep 10
 
     if [[ $return_to_menu == true ]]; then
       break
