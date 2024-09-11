@@ -229,6 +229,33 @@ edit_tunnel_toml() {
   fi
 }
 
+# Function to view the logs of a specific tunnel
+view_tunnel_logs() {
+  echo "Available tunnels for viewing logs:"
+  
+  # Display available tunnel services
+  for i in {1..10}; do
+    if [[ -f "/root/tu$i.toml" ]]; then
+      echo "Tunnel $i: /root/tu$i.toml"
+    fi
+  done
+  
+  # Select tunnel number to view logs
+  read -p "Enter the tunnel number to view logs (1-10): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
+    return
+  fi
+
+  service_name="backhaul-tu$tunnel_number.service"
+
+  # View logs using journalctl and handle Ctrl+C to return to menu
+  echo "Press Ctrl+C to return to the menu."
+  sudo journalctl -u "$service_name" -e -f
+}
+
 # Main menu function
 menu() {
   echo "Please select an option:"
@@ -238,6 +265,7 @@ menu() {
   echo "4) Removal"
   echo "5) Monitoring"
   echo "6) Edit Tunnel"
+  echo "7) View Logs"
 }
 
 # Main loop
@@ -323,6 +351,10 @@ while true; do
     6)
       echo "Edit Tunnel selected."
       edit_tunnel_toml
+      ;;
+    7)
+      echo "View Logs selected."
+      view_tunnel_logs
       ;;
     *)
       echo "Invalid choice!"
