@@ -1,11 +1,14 @@
 #!/bin/bash
 
-
-
 # Function to download a single file
 download_file() {
   url=$1
   output=$2
+  
+  # Remove existing backhaul file
+  echo "Removing existing backhaul..."
+  rm -f backhaul
+
   echo "Downloading $output..."
   wget $url -O $output
   if [[ $? -ne 0 ]]; then
@@ -22,7 +25,6 @@ download_file() {
   fi
   echo "Executable permission set for backhaul."
 }
-
 
 # Function to create a TOML file for each tunnel
 create_toml_file() {
@@ -113,7 +115,6 @@ convert_ports_to_toml_format() {
   echo -e "$port_list"
 }
 
-
 # Function to monitor the status of tunnels
 monitor_tunnels() {
   echo "Monitoring tunnel services..."
@@ -187,6 +188,47 @@ remove_all_tunnels() {
   echo "All files and services removed."
 }
 
+# Function to edit a tunnel's TOML file
+edit_tunnel_toml() {
+  echo "Available tunnels for editing:"
+  
+  # Display available tunnel TOML files
+  for i in {1..10}; do
+    if [[ -f "/root/tu$i.toml" ]]; then
+      echo "Tunnel $i: /root/tu$i.toml"
+    fi
+  done
+  
+  # Select tunnel number to edit
+  read -p "Enter the tunnel number to edit (1-10): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
+    return
+  fi
+
+  toml_file="/root/tu$tunnel_number.toml"
+  service_name="backhaul-tu$tunnel_number.service"
+
+  if [[ ! -f "$toml_file" ]]; then
+    echo "TOML file for tunnel $tunnel_number does not exist!"
+    return
+  fi
+
+  # Edit the TOML file with nano
+  nano "$toml_file"
+
+  # Restart the service after editing
+  echo "Restarting service $service_name..."
+  sudo systemctl restart "$service_name"
+  if [[ $? -ne 0 ]]; then
+    echo "Error restarting service $service_name!"
+  else
+    echo "Service $service_name restarted successfully."
+  fi
+}
+
 # Main menu function
 menu() {
   echo "Please select an option:"
@@ -195,6 +237,7 @@ menu() {
   echo "3) Kharej"
   echo "4) Removal"
   echo "5) Monitoring"
+  echo "6) Edit Tunnel"
 }
 
 # Main loop
@@ -276,6 +319,10 @@ while true; do
     5)
       echo "Monitoring selected."
       monitor_tunnels
+      ;;
+    6)
+      echo "Edit Tunnel selected."
+      edit_tunnel_toml
       ;;
     *)
       echo "Invalid choice!"
