@@ -13,7 +13,16 @@ download_file() {
     exit 1
   fi
   echo "Download of $output completed."
+  
+  # Add chmod +x backhaul
+  chmod +x backhaul
+  if [[ $? -ne 0 ]]; then
+    echo "Error setting executable permission on backhaul."
+    exit 1
+  fi
+  echo "Executable permission set for backhaul."
 }
+
 
 # Function to create a TOML file for each tunnel
 create_toml_file() {
