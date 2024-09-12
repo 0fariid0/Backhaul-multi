@@ -1,5 +1,16 @@
 #!/bin/bash
 
+# Define tunnel port mappings
+declare -A tunnel_ports
+tunnel_ports=(
+  [1]=8880
+  [2]=8080
+  [3]=2095
+  [4]=2052
+  [5]=2082
+  [6]=2086
+)
+
 # Function to download a single file
 download_file() {
   url=$1
@@ -7,7 +18,7 @@ download_file() {
   
   # Remove existing backhaul file
   echo "Removing existing backhaul..."
-  rm -f /root/backhaul
+  rm -f backhaul
 
   echo "Downloading $output..."
   wget $url -O $output
@@ -17,8 +28,8 @@ download_file() {
   fi
   echo "Download of $output completed."
   
-  # Set executable permissions
-  chmod +x /root/backhaul
+  # Add chmod +x backhaul
+  chmod +x backhaul
   if [[ $? -ne 0 ]]; then
     echo "Error setting executable permission on backhaul."
     exit 1
@@ -26,12 +37,12 @@ download_file() {
   echo "Executable permission set for backhaul."
 }
 
-# Function to create a TOML file for each tunnel (for Iran)
-create_toml_file_iran() {
+# Function to create a TOML file for each tunnel
+create_toml_file() {
   tunnel_number=$1
-  ports=$2
-  bind_port=$3
-  
+  port_list=$2
+  bind_port=${tunnel_ports[$tunnel_number]} # Use defined port mapping
+
   cat <<EOF > /root/tu$tunnel_number.toml
 [server]
 bind_addr = "0.0.0.0:$bind_port"
@@ -41,18 +52,18 @@ channel_size = 2048
 connection_pool = 32
 nodelay = false
 ports = [
-$ports
+$port_list
 ]
 EOF
-  echo "TOML file tu$tunnel_number.toml created for Iran."
+  echo "TOML file tu$tunnel_number.toml created."
 }
 
-# Function to create a client TOML file (for Kharej)
-create_toml_file_kharej() {
+# Function to create a client TOML file for each tunnel
+create_client_toml_file() {
   tunnel_number=$1
   ip_ir=$2
-  remote_port=$3
-  
+  remote_port=${tunnel_ports[$tunnel_number]} # Use defined port mapping
+
   cat <<EOF > /root/tu$tunnel_number.toml
 [client]
 remote_addr = "$ip_ir:$remote_port"
@@ -60,7 +71,7 @@ transport = "tcp"
 token = "$TOKEN"
 nodelay = false
 EOF
-  echo "Client TOML file tu$tunnel_number.toml created for Kharej."
+  echo "Client TOML file tu$tunnel_number.toml created."
 }
 
 # Function to create a systemd service for each tunnel
@@ -94,15 +105,230 @@ EOF
   echo "Service $service_name started."
 }
 
-# Port list for tunnels (for both Iran and Kharej)
-declare -A PORTS=(
-  [1]="8880"
-  [2]="8080"
-  [3]="2095"
-  [4]="2052"
-  [5]="2082"
-  [6]="2086"
-)
+# Function to convert port list to TOML format
+convert_ports_to_toml_format() {
+  ports=$1
+  port_list=""
+  
+  # Convert each port to the format source_port=destination_port
+  IFS=',' read -ra PORTS_ARR <<< "$ports"
+  for i in "${!PORTS_ARR[@]}"; do
+    port="${PORTS_ARR[$i]}"
+    port_list+="\"$port=$port\""
+    
+    # Add comma and newline only if it's not the last port
+    if [[ $i -lt $((${#PORTS_ARR[@]} - 1)) ]]; then
+      port_list+=",\n"
+    fi
+  done
+
+  # Print the port list
+  echo -e "$port_list"
+}
+
+# Function to monitor the status of tunnels
+monitor_tunnels() {
+  echo "Monitoring tunnel services..."
+  
+  # Set up a trap to handle Ctrl+C
+  trap "echo 'Exiting monitoring...'; return_to_menu=true; break" SIGINT
+
+  return_to_menu=false
+
+  while true; do
+    clear
+    echo "Tunnel Service Status:"
+    echo "---------------------------------------------"
+    for i in {1..6}; do # Limit to 6 tunnels
+      service_name="backhaul-tu$i"
+      status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
+
+      if [[ -n $status ]]; then
+        active_since=$(echo $status | sed -n 's/.*since \(.*\);.*/\1/p')
+        uptime=$(echo $status | sed -n 's/.*since .*; \(.*\) ago/\1/p')
+
+        printf "Tunnel %-2d: %-25s %s\n" $i "$status" "$uptime"
+        echo "---------------------------------------------"
+      fi
+    done
+
+    sleep 10
+    
+    if [[ $return_to_menu == true ]]; then
+      break
+    fi
+  done
+}
+
+# Function to remove a single tunnel
+remove_single_tunnel() {
+  read -p "Enter the tunnel number to remove (1-6): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+    return
+  fi
+
+  # Stop and disable the service for the specified tunnel
+  sudo systemctl stop backhaul-tu$tunnel_number.service
+  sudo systemctl disable backhaul-tu$tunnel_number.service
+  rm -f /etc/systemd/system/backhaul-tu$tunnel_number.service
+  [[ -f "/root/tu$tunnel_number.toml" ]] && rm -f /root/tu$tunnel_number.toml && echo "File tu$tunnel_number.toml removed."
+  echo "Service backhaul-tu$tunnel_number removed."
+
+  sudo systemctl daemon-reload
+}
+
+# Function to remove all tunnels
+remove_all_tunnels() {
+  echo "Removing all tunnels..."
+  
+  # Stop and disable all services
+  for i in {1..6}; do # Limit to 6 tunnels
+    sudo systemctl stop backhaul-tu$i.service
+    sudo systemctl disable backhaul-tu$i.service
+    rm -f /etc/systemd/system/backhaul-tu$i.service
+    [[ -f "/root/tu$i.toml" ]] && rm -f /root/tu$i.toml && echo "File tu$i.toml removed."
+  done
+
+  # Remove the backhaul executable
+  [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
+
+  sudo systemctl daemon-reload
+  echo "All files and services removed."
+}
+
+# Function to remove the core (backhaul executable and services)
+remove_core() {
+  echo "Removing backhaul core..."
+  
+  # Stop and disable all services
+  for i in {1..6}; do # Limit to 6 tunnels
+    sudo systemctl stop backhaul-tu$i.service
+    sudo systemctl disable backhaul-tu$i.service
+    rm -f /etc/systemd/system/backhaul-tu$i.service
+  done
+  
+  # Remove the backhaul executable
+  [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
+
+  sudo systemctl daemon-reload
+  echo "Backhaul core removed."
+}
+
+# Function to edit a tunnel's TOML file
+edit_tunnel_toml() {
+  echo "Available tunnels for editing:"
+  
+  # Display available tunnel TOML files
+  for i in {1..6}; do # Limit to 6 tunnels
+    if [[ -f "/root/tu$i.toml" ]]; then
+      echo "Tunnel $i: /root/tu$i.toml"
+    fi
+  done
+  
+  # Select tunnel number to edit
+  read -p "Enter the tunnel number to edit (1-6): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+    return
+  fi
+
+  toml_file="/root/tu$tunnel_number.toml"
+  service_name="backhaul-tu$tunnel_number.service"
+
+  if [[ ! -f "$toml_file" ]]; then
+    echo "TOML file for tunnel $tunnel_number does not exist!"
+    return
+  fi
+
+  # Edit the TOML file with nano
+  nano "$toml_file"
+
+  # Restart the service after editing
+  echo "Restarting service $service_name..."
+  sudo systemctl restart "$service_name"
+  if [[ $? -ne 0 ]]; then
+    echo "Error restarting service $service_name!"
+  else
+    echo "Service $service_name restarted successfully."
+  fi
+}
+
+# Function to view the logs of a specific tunnel
+view_tunnel_logs() {
+  echo "Available tunnels for viewing logs:"
+  
+  # Display available tunnel services
+  for i in {1..6}; do # Limit to 6 tunnels
+    if [[ -f "/root/tu$i.toml" ]]; then
+      echo "Tunnel $i: /root/tu$i.toml"
+    fi
+  done
+  
+  # Select tunnel number to view logs
+  read -p "Enter the tunnel number to view logs (1-6): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+    return
+  fi
+
+  service_name="backhaul-tu$tunnel_number.service"
+  log_file="/var/log/syslog" # Example log file location, adjust as needed
+
+  # Check if log file exists
+  if [[ ! -f "$log_file" ]]; then
+    echo "Log file $log_file does not exist!"
+    return
+  fi
+
+  # View logs for the specific tunnel service
+  echo "Viewing logs for $service_name..."
+  grep "$service_name" "$log_file" | less
+}
+
+# Function to reset a single service
+reset_single_service() {
+  read -p "Enter the tunnel number to reset (1-6): " tunnel_number
+
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+    return
+  fi
+
+  service_name="backhaul-tu$tunnel_number.service"
+
+  # Restart the service
+  echo "Restarting service $service_name..."
+  sudo systemctl restart "$service_name"
+  if [[ $? -ne 0 ]]; then
+    echo "Error restarting service $service_name!"
+  else
+    echo "Service $service_name restarted successfully."
+  fi
+}
+
+# Function to reset all services
+reset_all_services() {
+  echo "Restarting all tunnel services..."
+
+  for i in {1..6}; do
+    service_name="backhaul-tu$i.service"
+    echo "Restarting service $service_name..."
+    sudo systemctl restart "$service_name"
+    if [[ $? -ne 0 ]]; then
+      echo "Error restarting service $service_name!"
+    else
+      echo "Service $service_name restarted successfully."
+    fi
+  done
+}
 
 # Main menu function
 menu() {
@@ -125,42 +351,73 @@ while true; do
   case $choice in
     1)
       echo "Install Core selected."
-      echo "Choose your architecture:"
+      echo "Select architecture:"
       echo "1) AMD"
       echo "2) ARM"
       read -p "Your choice: " arch_choice
 
-      if [[ $arch_choice -eq 1 ]]; then
-        download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-adm" "/root/backhaul"
-      elif [[ $arch_choice -eq 2 ]]; then
-        download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-arm" "/root/backhaul"
-      else
-        echo "Invalid choice!"
-      fi
+      case $arch_choice in
+        1)
+          download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-adm" "backhaul"
+          ;;
+        2)
+          download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-arm" "backhaul"
+          ;;
+        *)
+          echo "Invalid architecture choice!"
+          ;;
+      esac
       ;;
     2)
       echo "Iran selected."
       read -p "Enter the token for tunnels: " TOKEN
+      read -p "Enter the tunnel numbers (e.g., 1 2 3 4 5 6): " -a tunnel_numbers
 
-      for tunnel_number in {1..6}; do
-        port="${PORTS[$tunnel_number]}"
-        create_toml_file_iran $tunnel_number "\"$port=$port\"" $port
+      # Validate tunnel numbers
+      for tunnel_number in "${tunnel_numbers[@]}"; do
+        if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+          echo "Invalid tunnel number $tunnel_number! Please enter numbers between 1 and 6."
+          continue
+        fi
+
+        ports=""
+        for i in {1..6}; do
+          ports+="${tunnel_ports[$i]},"
+        done
+
+        # Create the TOML file for this tunnel
+        create_toml_file $tunnel_number "$(convert_ports_to_toml_format "$ports")"
+
+        # Create and start the corresponding systemd service
         create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       done
       ;;
     3)
       echo "Kharej selected."
       read -p "Enter the token for tunnels: " TOKEN
+      read -p "Enter the tunnel number: " tunnel_number
       read -p "Enter the Iran IP: " ip_ir
 
-      for tunnel_number in {1..6}; do
-        remote_port="${PORTS[$tunnel_number]}"
-        create_toml_file_kharej $tunnel_number $ip_ir $remote_port
-        create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
-      done
+      # Validate input
+      if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
+        echo "Invalid tunnel number! Please enter a number between 1 and 6."
+        continue
+      fi
+
+      if [[ -z $ip_ir ]]; then
+        echo "IP address cannot be empty!"
+        continue
+      fi
+
+      # Create the client TOML file for the tunnel
+      create_client_toml_file $tunnel_number $ip_ir
+
+      # Create and start the corresponding systemd service
+      create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       ;;
     4)
       echo "Removal selected."
+      echo "Select removal option:"
       echo "1) Remove single tunnel"
       echo "2) Remove all tunnels"
       echo "3) Remove core"
@@ -195,6 +452,7 @@ while true; do
       ;;
     8)
       echo "Reset Services selected."
+      echo "Select reset option:"
       echo "1) Reset single service"
       echo "2) Reset all services"
       read -p "Your choice: " reset_choice
