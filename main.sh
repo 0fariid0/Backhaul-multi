@@ -1,16 +1,5 @@
 #!/bin/bash
 
-# Define tunnel port mappings
-declare -A tunnel_ports
-tunnel_ports=(
-  [1]=8880
-  [2]=8080
-  [3]=2095
-  [4]=2052
-  [5]=2082
-  [6]=2086
-)
-
 # Function to download a single file
 download_file() {
   url=$1
@@ -41,7 +30,7 @@ download_file() {
 create_toml_file() {
   tunnel_number=$1
   port_list=$2
-  bind_port=${tunnel_ports[$tunnel_number]} # Use defined port mapping
+  bind_port=$((1000 + tunnel_number)) # Example: bind_addr starts from port 1001
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [server]
@@ -49,7 +38,7 @@ bind_addr = "0.0.0.0:$bind_port"
 transport = "tcp"
 token = "$TOKEN"
 channel_size = 2048
-connection_pool = 32
+connection_pool = 16
 nodelay = false
 ports = [
 $port_list
@@ -62,7 +51,7 @@ EOF
 create_client_toml_file() {
   tunnel_number=$1
   ip_ir=$2
-  remote_port=${tunnel_ports[$tunnel_number]} # Use defined port mapping
+  remote_port=$((1000 + tunnel_number)) # Example: remote_addr starts from port 1001
 
   cat <<EOF > /root/tu$tunnel_number.toml
 [client]
@@ -139,7 +128,7 @@ monitor_tunnels() {
     clear
     echo "Tunnel Service Status:"
     echo "---------------------------------------------"
-    for i in {1..6}; do # Limit to 6 tunnels
+    for i in {1..10}; do
       service_name="backhaul-tu$i"
       status=$(systemctl status $service_name 2>/dev/null | grep "Active:")
 
@@ -162,11 +151,11 @@ monitor_tunnels() {
 
 # Function to remove a single tunnel
 remove_single_tunnel() {
-  read -p "Enter the tunnel number to remove (1-6): " tunnel_number
+  read -p "Enter the tunnel number to remove (1-10): " tunnel_number
 
   # Validate input
-  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
 
@@ -185,7 +174,7 @@ remove_all_tunnels() {
   echo "Removing all tunnels..."
   
   # Stop and disable all services
-  for i in {1..6}; do # Limit to 6 tunnels
+  for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
     sudo systemctl disable backhaul-tu$i.service
     rm -f /etc/systemd/system/backhaul-tu$i.service
@@ -204,7 +193,7 @@ remove_core() {
   echo "Removing backhaul core..."
   
   # Stop and disable all services
-  for i in {1..6}; do # Limit to 6 tunnels
+  for i in {1..10}; do
     sudo systemctl stop backhaul-tu$i.service
     sudo systemctl disable backhaul-tu$i.service
     rm -f /etc/systemd/system/backhaul-tu$i.service
@@ -222,18 +211,18 @@ edit_tunnel_toml() {
   echo "Available tunnels for editing:"
   
   # Display available tunnel TOML files
-  for i in {1..6}; do # Limit to 6 tunnels
+  for i in {1..10}; do
     if [[ -f "/root/tu$i.toml" ]]; then
       echo "Tunnel $i: /root/tu$i.toml"
     fi
   done
   
   # Select tunnel number to edit
-  read -p "Enter the tunnel number to edit (1-6): " tunnel_number
+  read -p "Enter the tunnel number to edit (1-10): " tunnel_number
 
   # Validate input
-  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
 
@@ -263,47 +252,43 @@ view_tunnel_logs() {
   echo "Available tunnels for viewing logs:"
   
   # Display available tunnel services
-  for i in {1..6}; do # Limit to 6 tunnels
+  for i in {1..10}; do
     if [[ -f "/root/tu$i.toml" ]]; then
       echo "Tunnel $i: /root/tu$i.toml"
     fi
   done
   
   # Select tunnel number to view logs
-  read -p "Enter the tunnel number to view logs (1-6): " tunnel_number
+  read -p "Enter the tunnel number to view logs (1-10): " tunnel_number
 
   # Validate input
-  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
 
   service_name="backhaul-tu$tunnel_number.service"
-  log_file="/var/log/syslog" # Example log file location, adjust as needed
 
-  # Check if log file exists
-  if [[ ! -f "$log_file" ]]; then
-    echo "Log file $log_file does not exist!"
-    return
-  fi
-
-  # View logs for the specific tunnel service
-  echo "Viewing logs for $service_name..."
-  grep "$service_name" "$log_file" | less
+  # Set up a trap to catch Ctrl+C and return to menu
+  trap 'echo "Returning to the menu..."; return' SIGINT
+  
+  # View logs using journalctl and handle Ctrl+C to return to menu
+  echo "Press Ctrl+C to return to the menu."
+  sudo journalctl -u "$service_name" -e -f
 }
 
 # Function to reset a single service
 reset_single_service() {
-  read -p "Enter the tunnel number to reset (1-6): " tunnel_number
+  read -p "Enter the tunnel number to reset (1-10): " tunnel_number
 
   # Validate input
-  if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-    echo "Invalid tunnel number! Please enter a number between 1 and 6."
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
     return
   fi
 
   service_name="backhaul-tu$tunnel_number.service"
-
+  
   # Restart the service
   echo "Restarting service $service_name..."
   sudo systemctl restart "$service_name"
@@ -317,10 +302,11 @@ reset_single_service() {
 # Function to reset all services
 reset_all_services() {
   echo "Restarting all tunnel services..."
-
-  for i in {1..6}; do
+  
+  # Restart all services
+  for i in {1..10}; do
     service_name="backhaul-tu$i.service"
-    echo "Restarting service $service_name..."
+    echo "Restarting $service_name..."
     sudo systemctl restart "$service_name"
     if [[ $? -ne 0 ]]; then
       echo "Error restarting service $service_name!"
@@ -351,42 +337,27 @@ while true; do
   case $choice in
     1)
       echo "Install Core selected."
-      echo "Select architecture:"
-      echo "1) AMD"
-      echo "2) ARM"
-      read -p "Your choice: " arch_choice
-
-      case $arch_choice in
-        1)
-          download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-adm" "backhaul"
-          ;;
-        2)
-          download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-arm" "backhaul"
-          ;;
-        *)
-          echo "Invalid architecture choice!"
-          ;;
-      esac
+      update_system
+      if [[ ! -f "/root/backhaul" ]]; then
+        download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul" "/root/backhaul"
+      else
+        echo "Backhaul file already downloaded."
+      fi
       ;;
     2)
       echo "Iran selected."
       read -p "Enter the token for tunnels: " TOKEN
-      read -p "Enter the tunnel numbers (e.g., 1 2 3 4 5 6): " -a tunnel_numbers
+      read -p "Enter the tunnel numbers (e.g., 1 5 7): " -a tunnel_numbers
 
-      # Validate tunnel numbers
       for tunnel_number in "${tunnel_numbers[@]}"; do
-        if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-          echo "Invalid tunnel number $tunnel_number! Please enter numbers between 1 and 6."
-          continue
-        fi
-
-        ports=""
-        for i in {1..6}; do
-          ports+="${tunnel_ports[$i]},"
-        done
+        echo "For tunnel $tunnel_number, please enter the ports (e.g., 8080, 38753):"
+        read -p "Ports for tunnel $tunnel_number: " ports
+        
+        # Convert ports to TOML format
+        port_list=$(convert_ports_to_toml_format "$ports")
 
         # Create the TOML file for this tunnel
-        create_toml_file $tunnel_number "$(convert_ports_to_toml_format "$ports")"
+        create_toml_file $tunnel_number "$port_list"
 
         # Create and start the corresponding systemd service
         create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
@@ -399,8 +370,8 @@ while true; do
       read -p "Enter the Iran IP: " ip_ir
 
       # Validate input
-      if [[ ! $tunnel_number =~ ^[1-6]$ ]]; then
-        echo "Invalid tunnel number! Please enter a number between 1 and 6."
+      if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+        echo "Invalid tunnel number! Please enter a number between 1 and 10."
         continue
       fi
 
