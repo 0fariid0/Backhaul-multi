@@ -283,7 +283,7 @@ while true; do
       echo "Install Core selected."
       update_system
       if [[ ! -f "/root/backhaul" ]]; then
-        download_file "https://github.com/0fariid0/bakulme/raw/main/backhaul" "/root/backhaul"
+        download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul" "/root/backhaul"
       else
         echo "Backhaul file already downloaded."
       fi
