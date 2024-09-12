@@ -188,6 +188,24 @@ remove_all_tunnels() {
   echo "All files and services removed."
 }
 
+# Function to remove the core (backhaul executable and services)
+remove_core() {
+  echo "Removing backhaul core..."
+  
+  # Stop and disable all services
+  for i in {1..10}; do
+    sudo systemctl stop backhaul-tu$i.service
+    sudo systemctl disable backhaul-tu$i.service
+    rm -f /etc/systemd/system/backhaul-tu$i.service
+  done
+  
+  # Remove the backhaul executable
+  [[ -f "/root/backhaul" ]] && rm -f /root/backhaul && echo "Backhaul file removed."
+
+  sudo systemctl daemon-reload
+  echo "Backhaul core removed."
+}
+
 # Function to edit a tunnel's TOML file
 edit_tunnel_toml() {
   echo "Available tunnels for editing:"
@@ -251,7 +269,7 @@ view_tunnel_logs() {
 
   service_name="backhaul-tu$tunnel_number.service"
 
-  # Set up a trap to catch Ctrl+C and return to the menu
+  # Set up a trap to catch Ctrl+C and return to menu
   trap 'echo "Returning to the menu..."; return' SIGINT
   
   # View logs using journalctl and handle Ctrl+C to return to menu
@@ -259,7 +277,44 @@ view_tunnel_logs() {
   sudo journalctl -u "$service_name" -e -f
 }
 
+# Function to reset a single service
+reset_single_service() {
+  read -p "Enter the tunnel number to reset (1-10): " tunnel_number
 
+  # Validate input
+  if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+    echo "Invalid tunnel number! Please enter a number between 1 and 10."
+    return
+  fi
+
+  service_name="backhaul-tu$tunnel_number.service"
+  
+  # Restart the service
+  echo "Restarting service $service_name..."
+  sudo systemctl restart "$service_name"
+  if [[ $? -ne 0 ]]; then
+    echo "Error restarting service $service_name!"
+  else
+    echo "Service $service_name restarted successfully."
+  fi
+}
+
+# Function to reset all services
+reset_all_services() {
+  echo "Restarting all tunnel services..."
+  
+  # Restart all services
+  for i in {1..10}; do
+    service_name="backhaul-tu$i.service"
+    echo "Restarting $service_name..."
+    sudo systemctl restart "$service_name"
+    if [[ $? -ne 0 ]]; then
+      echo "Error restarting service $service_name!"
+    else
+      echo "Service $service_name restarted successfully."
+    fi
+  done
+}
 
 # Main menu function
 menu() {
@@ -271,6 +326,7 @@ menu() {
   echo "5) Monitoring"
   echo "6) Edit Tunnel"
   echo "7) View Logs"
+  echo "8) Reset Services"
 }
 
 # Main loop
@@ -335,6 +391,7 @@ while true; do
       echo "Select removal option:"
       echo "1) Remove single tunnel"
       echo "2) Remove all tunnels"
+      echo "3) Remove core"
       read -p "Your choice: " removal_choice
 
       case $removal_choice in
@@ -343,6 +400,9 @@ while true; do
           ;;
         2)
           remove_all_tunnels
+          ;;
+        3)
+          remove_core
           ;;
         *)
           echo "Invalid choice!"
@@ -360,6 +420,25 @@ while true; do
     7)
       echo "View Logs selected."
       view_tunnel_logs
+      ;;
+    8)
+      echo "Reset Services selected."
+      echo "Select reset option:"
+      echo "1) Reset single service"
+      echo "2) Reset all services"
+      read -p "Your choice: " reset_choice
+
+      case $reset_choice in
+        1)
+          reset_single_service
+          ;;
+        2)
+          reset_all_services
+          ;;
+        *)
+          echo "Invalid choice!"
+          ;;
+      esac
       ;;
     *)
       echo "Invalid choice!"
