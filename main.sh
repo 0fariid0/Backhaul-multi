@@ -251,10 +251,15 @@ view_tunnel_logs() {
 
   service_name="backhaul-tu$tunnel_number.service"
 
+  # Set up a trap to catch Ctrl+C and return to the menu
+  trap 'echo "Returning to the menu..."; return' SIGINT
+  
   # View logs using journalctl and handle Ctrl+C to return to menu
   echo "Press Ctrl+C to return to the menu."
   sudo journalctl -u "$service_name" -e -f
 }
+
+
 
 # Main menu function
 menu() {
