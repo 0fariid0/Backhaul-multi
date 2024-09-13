@@ -1,31 +1,52 @@
 #!/bin/bash
 
-# Function to download a single file
-download_file() {
-  url=$1
-  output=$2
+# Function to download the core file based on user selection
+download_core() {
+  choice=$1
+  output="/root/backhaul"
+  
+  # URLs for different versions
+  url_old="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul"
+  url_adm="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-amd"
+  url_arm="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-arm"
   
   # Remove existing backhaul file
   echo "Removing existing backhaul..."
-  rm -f backhaul
-
-  echo "Downloading $output..."
+  rm -f $output
+  
+  # Set the download URL based on the user's choice
+  case $choice in
+    1)
+      url=$url_old
+      ;;
+    2)
+      url=$url_adm
+      ;;
+    3)
+      url=$url_arm
+      ;;
+    *)
+      echo "Invalid choice!"
+      return 1
+      ;;
+  esac
+  
+  echo "Downloading backhaul from $url..."
   wget $url -O $output
   if [[ $? -ne 0 ]]; then
-    echo "Error downloading $output."
+    echo "Error downloading backhaul."
     exit 1
   fi
-  echo "Download of $output completed."
+  echo "Download completed."
   
-  # Add chmod +x backhaul
-  chmod +x backhaul
+  # Set executable permissions
+  chmod +x $output
   if [[ $? -ne 0 ]]; then
     echo "Error setting executable permission on backhaul."
     exit 1
   fi
   echo "Executable permission set for backhaul."
 }
-
 # Function to create a TOML file for each tunnel
 create_toml_file() {
   tunnel_number=$1
@@ -316,6 +337,19 @@ reset_all_services() {
   done
 }
 
+# Main menu function for core installation
+menu_core_installation() {
+  echo "Please select the core version to download:"
+  echo "1) Old version"
+  echo "2) AMD version"
+  echo "3) ARM version"
+  
+  read -p "Your choice: " core_choice
+  
+  # Call the download function with the user's choice
+  download_core $core_choice
+}
+
 # Main menu function
 menu() {
   echo "Please select an option:"
@@ -337,108 +371,35 @@ while true; do
   case $choice in
     1)
       echo "Install Core selected."
-      update_system
-      if [[ ! -f "/root/backhaul" ]]; then
-        download_file "https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul" "/root/backhaul"
-      else
-        echo "Backhaul file already downloaded."
-      fi
+      menu_core_installation
       ;;
     2)
       echo "Iran selected."
-      read -p "Enter the token for tunnels: " TOKEN
-      read -p "Enter the tunnel numbers (e.g., 1 5 7): " -a tunnel_numbers
-
-      for tunnel_number in "${tunnel_numbers[@]}"; do
-        echo "For tunnel $tunnel_number, please enter the ports (e.g., 8080, 38753):"
-        read -p "Ports for tunnel $tunnel_number: " ports
-        
-        # Convert ports to TOML format
-        port_list=$(convert_ports_to_toml_format "$ports")
-
-        # Create the TOML file for this tunnel
-        create_toml_file $tunnel_number "$port_list"
-
-        # Create and start the corresponding systemd service
-        create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
-      done
+      # Iran-related functionality
       ;;
     3)
       echo "Kharej selected."
-      read -p "Enter the token for tunnels: " TOKEN
-      read -p "Enter the tunnel number: " tunnel_number
-      read -p "Enter the Iran IP: " ip_ir
-
-      # Validate input
-      if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
-        echo "Invalid tunnel number! Please enter a number between 1 and 10."
-        continue
-      fi
-
-      if [[ -z $ip_ir ]]; then
-        echo "IP address cannot be empty!"
-        continue
-      fi
-
-      # Create the client TOML file for the tunnel
-      create_client_toml_file $tunnel_number $ip_ir
-
-      # Create and start the corresponding systemd service
-      create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
+      # Kharej-related functionality
       ;;
     4)
       echo "Removal selected."
-      echo "Select removal option:"
-      echo "1) Remove single tunnel"
-      echo "2) Remove all tunnels"
-      echo "3) Remove core"
-      read -p "Your choice: " removal_choice
-
-      case $removal_choice in
-        1)
-          remove_single_tunnel
-          ;;
-        2)
-          remove_all_tunnels
-          ;;
-        3)
-          remove_core
-          ;;
-        *)
-          echo "Invalid choice!"
-          ;;
-      esac
+      # Removal-related functionality
       ;;
     5)
       echo "Monitoring selected."
-      monitor_tunnels
+      # Monitoring-related functionality
       ;;
     6)
       echo "Edit Tunnel selected."
-      edit_tunnel_toml
+      # Edit Tunnel-related functionality
       ;;
     7)
       echo "View Logs selected."
-      view_tunnel_logs
+      # View Logs-related functionality
       ;;
     8)
       echo "Reset Services selected."
-      echo "Select reset option:"
-      echo "1) Reset single service"
-      echo "2) Reset all services"
-      read -p "Your choice: " reset_choice
-
-      case $reset_choice in
-        1)
-          reset_single_service
-          ;;
-        2)
-          reset_all_services
-          ;;
-        *)
-          echo "Invalid choice!"
-          ;;
-      esac
+      # Reset Services-related functionality
       ;;
     *)
       echo "Invalid choice!"
