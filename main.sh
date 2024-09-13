@@ -1,14 +1,13 @@
 #!/bin/bash
 
-# Function to download the core file based on user selection
 download_core() {
   local choice=$1
   local output="/root/backhaul"
   
   # URLs for different versions
-  local url_old="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul"
-  local url_adm="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-amd"
-  local url_arm="https://github.com/0fariid0/Backhaul-multi/blob/main/backhaul-arm"
+  local url_old="https://raw.githubusercontent.com/0fariid0/Backhaul-multi/main/backhaul"
+  local url_adm="https://raw.githubusercontent.com/0fariid0/Backhaul-multi/main/backhaul-amd"
+  local url_arm="https://raw.githubusercontent.com/0fariid0/Backhaul-multi/main/backhaul-arm"
   
   # Remove existing backhaul file
   echo "Removing existing backhaul..."
@@ -47,6 +46,7 @@ download_core() {
   fi
   echo "Executable permission set for backhaul."
 }
+
 
 # Function to create a TOML file for each tunnel
 create_toml_file() {
