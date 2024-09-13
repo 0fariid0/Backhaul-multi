@@ -375,31 +375,99 @@ while true; do
       ;;
     2)
       echo "Iran selected."
-      # Iran-related functionality
+      read -p "Enter the token for tunnels: " TOKEN
+      read -p "Enter the tunnel numbers (e.g., 1 5 7): " -a tunnel_numbers
+
+      for tunnel_number in "${tunnel_numbers[@]}"; do
+        echo "For tunnel $tunnel_number, please enter the ports (e.g., 8080, 38753):"
+        read -p "Ports for tunnel $tunnel_number: " ports
+        
+        # Convert ports to TOML format
+        port_list=$(convert_ports_to_toml_format "$ports")
+
+        # Create the TOML file for this tunnel
+        create_toml_file $tunnel_number "$port_list"
+
+        # Create and start the corresponding systemd service
+        create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
+      done
       ;;
     3)
       echo "Kharej selected."
-      # Kharej-related functionality
+      read -p "Enter the token for tunnels: " TOKEN
+      read -p "Enter the tunnel number: " tunnel_number
+      read -p "Enter the Iran IP: " ip_ir
+
+      # Validate input
+      if [[ ! $tunnel_number =~ ^[1-9]$ && $tunnel_number -ne 10 ]]; then
+        echo "Invalid tunnel number! Please enter a number between 1 and 10."
+        continue
+      fi
+
+      if [[ -z $ip_ir ]]; then
+        echo "IP address cannot be empty!"
+        continue
+      fi
+
+      # Create the client TOML file for the tunnel
+      create_client_toml_file $tunnel_number $ip_ir
+
+      # Create and start the corresponding systemd service
+      create_service "backhaul-tu$tunnel_number" "tu$tunnel_number.toml"
       ;;
     4)
       echo "Removal selected."
-      # Removal-related functionality
+      echo "Select removal option:"
+      echo "1) Remove single tunnel"
+      echo "2) Remove all tunnels"
+      echo "3) Remove core"
+      read -p "Your choice: " removal_choice
+
+      case $removal_choice in
+        1)
+          remove_single_tunnel
+          ;;
+        2)
+          remove_all_tunnels
+          ;;
+        3)
+          remove_core
+          ;;
+        *)
+          echo "Invalid choice!"
+          ;;
+      esac
       ;;
     5)
       echo "Monitoring selected."
-      # Monitoring-related functionality
+      monitor_tunnels
       ;;
     6)
       echo "Edit Tunnel selected."
-      # Edit Tunnel-related functionality
+      edit_tunnel_toml
       ;;
     7)
       echo "View Logs selected."
-      # View Logs-related functionality
+      view_tunnel_logs
       ;;
     8)
       echo "Reset Services selected."
-      # Reset Services-related functionality
+      echo "Select reset option:"
+      echo "1) Reset single service"
+      echo "2) Reset all services"
+      read -p "Your choice: " reset_choice
+
+      case $reset_choice in
+        1)
+          reset_single_service
+          ;;
+        2)
+          reset_all_services
+          ;;
+        *)
+          echo "Invalid choice!"
+          ;;
+      esac
       ;;
     *)
       echo "Invalid choice!"
